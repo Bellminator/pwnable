@@ -1,5 +1,5 @@
 # Pwnable
-Where Nick tries to hack and constantly fails.
+Where Nick tries to hack and constantly fails. No peeking, there be spoilers below!
 
 ## Toddler's Bottle
 
