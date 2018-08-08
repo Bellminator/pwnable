@@ -41,7 +41,7 @@ We can't just pass ```0``` as the argument, because we subtract ```hex 0x1234```
 
 First, let's find out what ```0x1234``` is as an int.
 
-```python
+```bash
 $ python -c "print(int(0x1234))"
 4660
 ```
@@ -85,8 +85,8 @@ What the hell does this all mean? If the password file exists, fd is not the fil
 
 There's just one final trick - each character of our second password input is XOR'd. 
 ```c
-	// xor your input
-	xor(pw_buf2, 10);
+// xor your input
+xor(pw_buf2, 10);
 ```
 So whatever we put in for the second password needs to be the exact opposite of the first password. That's not too difficult, we can just put in 10 ```1```'s and 10 ```0```'s.
 
