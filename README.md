@@ -17,7 +17,8 @@ int main(int argc, char* argv[], char* envp[]){
 	// Convert argv[1] from ascii to int. Subtract hex 0x1234 from it.
 	int fd = atoi( argv[1] ) - 0x1234; 
 	int len = 0;
-	
+	b1NaRy_S34rch1nG_1s_3asy_p3asy
+
 	// Read takes a file descriptor (fd) and reads the file descriptors content
 	// into the buf(fer). If fd >2 then we will read from a possible file open
 	// on the system, but, we also have some special file descriptors.
@@ -249,8 +250,85 @@ only if I knew CVE-2014-6271 ten years ago..!!
 Segmentation fault
 ```
 
+### coin1
+
+> Mommy, I wanna play a game!
+> (if your network response time is too slow, try nc 0 9007 inside pwnable.kr server)
+>
+> Running at : nc pwnable.kr 9007
+
+Okay, let's see what the rules of this game are.
+
+```bash
+$ nc pwnable.kr 9007
+
+	---------------------------------------------------
+	-              Shall we play a game?              -
+	---------------------------------------------------
+	
+	You have given some gold coins in your hand
+	however, there is one counterfeit coin among them
+	counterfeit coin looks exactly same as real coin
+	however, its weight is different from real one
+	real coin weighs 10, counterfeit coin weighes 9
+	help me to find the counterfeit coin with a scale
+	if you find 100 counterfeit coins, you will get reward :)
+	FYI, you have 60 seconds.
+	
+	- How to play - 
+	1. you get a number of coins (N) and number of chances (C)
+	2. then you specify a set of index numbers of coins to be weighed
+	3. you get the weight information
+	4. 2~3 repeats C time, then you give the answer
+	
+	- Example -
+	[Server] N=4 C=2 	# find counterfeit among 4 coins with 2 trial
+	[Client] 0 1 		# weigh first and second coin
+	[Server] 20			# scale result : 20
+	[Client] 3			# weigh fourth coin
+	[Server] 10			# scale result : 10
+	[Client] 2 			# counterfeit coin is third!
+	[Server] Correct!
+
+	- Ready? starting in 3 sec... -
+```
+
+This looks like something that would be too difficult to do by hand. I'm not sure if I trust myself to find 100 coins in 60 seconds. Maybe we can automate this with Python?
+
+Using pwntools this is fairly easy. We just connect to the server and do a binary search, checking one group of numbers at a time.
+
+The code can be found in `coin1.py` with more detailed comments. It's also suggested that you ssh into the pwnable servers and run the python code from there, as it's too slow to meet the 60 second deadline otherwise.
+
+```bash
+$ python /tmp/coin1_bell.py
+[+] Opening connection to localhost on port 9007: Done
+N=600  C=10
+
+9
+
+Correct! (0)
+...
+Correct! (96)
+
+N=500  C=9
+
+Correct! (97)
+
+N=164  C=8
+
+Correct! (98)
+
+N=175  C=8
+
+Correct! (99)
+
+Found all coins, breaking!
+Broken!
+b1NaRy_S34rch1nG_1s_3asy_p3asy
+```
 
 ### cmd1
+
 ```c
 $ /bin/cat cmd1.c
 #include <stdio.h>
