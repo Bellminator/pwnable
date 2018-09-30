@@ -455,6 +455,119 @@ daddy, I just pwned a buFFer :)
 
 Tada!
 
+### blackjack
+> Hey! check out this C implementation of blackjack game!
+> I found it online
+> * http://cboard.cprogramming.com/c-programming/114023-simple-blackjack-program.html
+>
+> I like to give my flags to millionares.
+> how much money you got?
+> Running at : nc pwnable.kr 9009
+
+First off, don't do what I did and spend hours writing a python program that plays blackjack.
+It turns out the solution is not that the blackjack game logic is flawed and favors
+the player.
+
+We're given a link to a forumn thread where someone has posted their project
+for their intro to C programming class. Because of this, we can probably
+assume there is some relatively simple flaw in the logic.
+
+Sadly, the code is a bit of an eyesore to look at, and has a lot of fluff 
+(functions that print cards and such). What helped me was to quickly glance
+at these excess functions, and if I didn't see anything glaringly obvious
+I just removed or hid the function. Once you take out all the un-necessary bits
+and do a bit of cleanup things are easier to read.
+
+From there we just start reading function by function and try to find anything
+that seems off, especially anywhere user input is concerned.
+
+This function seems suspicious. It prompts the user to enter the amount they
+would like to bet. It understandably checks to make sure that the user isn't betting
+more money than they have, but it doesn't seem to verify that the user isn't
+betting a negative amount...
+
+```c
+int betting() //Asks user amount to bet
+{
+ printf("\n\nEnter Bet: $");
+ scanf("%d", &bet);
+ 
+ if (bet > cash) //If player tries to bet more money than player has
+ {
+        printf("\nYou cannot bet more money than you have.");
+        printf("\nEnter Bet: ");
+        scanf("%d", &bet);
+        return bet;
+ }
+ else return bet;
+}
+```
+
+How does this help us though? Here in the play() function, if we lose,
+we just subtract the bet amount from our cash.
+
+```c
+if(p>21) //If player total is over 21, loss
+{
+	printf("\nWoah Buddy, You Went WAY over.\n");
+	loss = loss+1;
+	cash = cash - bet;
+	printf("\nYou have %d Wins and %d Losses. Awesome!\n", won, loss);
+	dealer_total=0;
+	askover();
+}
+```
+
+Subtracting a negative yeilds a positive, so we should be able to just
+bet something at or less then -1000000 and then lose on purpose.
+
+So let's make a negative bet and try our best to lose.
+
+```none
+Cash: $500
+-------
+|H    |
+|  Q  |
+|    H|
+-------
+
+Your Total is 10
+
+The Dealer Has a Total of 8
+
+Enter Bet: $-1000000
+...
+The Dealer Has a Total of 19
+
+Would You Like to Hit or Stay?
+Please Enter H to Hit or S to Stay.
+H
+-------
+|D    |
+|  5  |
+|    D|
+-------
+
+Your Total is 25
+
+The Dealer Has a Total of 19
+Woah Buddy, You Went WAY over.
+
+You have 0 Wins and 1 Losses. Awesome!
+
+Would You Like To Play Again?
+Please Enter Y for Yes or N for No
+Y
+
+YaY_I_AM_A_MILLIONARE_LOL
+
+
+Cash: $1000500
+```
+
+And sure enough, there is our flag: `YaY_I_AM_A_MILLIONARE_LOL` along 
+with our cash of `$1000500`. Hoorah!
+
 ### cmd1
 
 ```c
